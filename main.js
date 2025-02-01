@@ -14,80 +14,65 @@ document.addEventListener('DOMContentLoaded', function() {
   calendar.render()
 })
 
-let currentStream = null;
-let currentCamera = 'environment'; // Fotocamera posteriore di default
-let currentVideoTrack = null; // Tieniamo traccia del video track per fermarlo facilmente
+// camera stream video element
+let on_stream_video = document.querySelector('#camera-stream');
+// flip button element
+let flipBtn = document.querySelector('#flip-btn');
 
-// Funzione per avviare la fotocamera
-function startCamera(facingMode = 'environment') {
-  // Ferma il flusso video precedente, se presente
-  if (currentStream) {
-    currentStream.getTracks().forEach(track => track.stop());
+// default user media options
+let constraints = { audio: false, video: true }
+let shouldFaceUser = true;
+
+// check whether we can use facingMode
+let supports = navigator.mediaDevices.getSupportedConstraints();
+if( supports['facingMode'] === true ) {
+  flipBtn.disabled = false;
+}
+
+let stream = null;
+
+function capture() {
+  constraints.video = {
+      width: {
+      min: 192,
+      ideal: 192,
+      max: 192,
+    },
+    height: {
+      min: 192,
+      ideal: 192,
+      max: 192
+    },
+    facingMode: shouldFaceUser ? 'user' : 'environment'
   }
-
-  // Chiedi l'accesso alla fotocamera con il facingMode (posteriore o frontale)
-  navigator.mediaDevices.getUserMedia({ video: { facingMode } })
-    .then((stream) => {
-      currentStream = stream;
-      const video = document.getElementById('video');
-      video.srcObject = stream;
-
-      // Memorizza il video track per poterlo fermare più tardi
-      currentVideoTrack = stream.getVideoTracks()[0];
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(function(mediaStream) {
+      stream  = mediaStream;
+      on_stream_video.srcObject = stream;
+      on_stream_video.play();
     })
-    .catch((error) => {
-      console.error('Errore nell\'accesso alla fotocamera:', error);
+    .catch(function(err) {
+      console.log(err)
     });
 }
 
-// Funzione per scattare la foto
-function takePhoto() {
-  const video = document.getElementById('video');
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
+flipBtn.addEventListener('click', function(){
+  if( stream == null ) return
+  // we need to flip, stop everything
+  stream.getTracks().forEach(t => {
+    t.stop();
+  });
+  // toggle / flip
+  shouldFaceUser = !shouldFaceUser;
+  capture();
+})
 
-  // Imposta le dimensioni del canvas uguali al video
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+capture();
 
-  // Disegna l'immagine dal video sul canvas
-  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  // Ottieni l'immagine dal canvas come Data URL
-  const photoPath = canvas.toDataURL('image/png'); // Salva come Data URL (base64)
-
-  // Mostra l'immagine nella pagina
-  document.getElementById('photo').src = photoPath;
-
-  // Mostra il pulsante per salvare la foto
-  document.getElementById('save-photo').style.display = 'inline-block';
-
-  // Aggiungi l'evento di salvataggio della foto
-  document.getElementById('save-photo').onclick = () => {
-    savePhoto(photoPath);
-  };
-}
-
-// Funzione per salvare la foto come file
-function savePhoto(photoPath) {
-  const link = document.createElement('a');
-  link.href = photoPath;
-  link.download = 'foto_catturata.png';
-  link.click();
-}
-
-// Funzione per cambiare la fotocamera
-function toggleCamera() {
-  // Cambia la fotocamera tra frontale e posteriore
-  currentCamera = (currentCamera === 'environment') ? 'user' : 'environment';
-  startCamera(currentCamera);
-}
-
-// Avvia la fotocamera al caricamento della pagina
-window.onload = () => startCamera(currentCamera);
-
-// Aggiungi l'evento per scattare la foto
-document.getElementById('take-photo').addEventListener('click', takePhoto);
-
-// Aggiungi l'evento per cambiare la fotocamera
-document.getElementById('toggle-camera').addEventListener('click', toggleCamera);
+document.getElementById("capture-camera").addEventListener("click", function() {
+  // Elements for taking the snapshot
+    const video = document.querySelector('video');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+});
