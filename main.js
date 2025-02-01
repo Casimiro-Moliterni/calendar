@@ -14,65 +14,88 @@ document.addEventListener('DOMContentLoaded', function() {
   calendar.render()
 })
 
-// camera stream video element
 let on_stream_video = document.querySelector('#camera-stream');
-// flip button element
 let flipBtn = document.querySelector('#flip-btn');
-
-// default user media options
-let constraints = { audio: false, video: true }
+let canvas = document.createElement('canvas');
 let shouldFaceUser = true;
+let stream = null;
 
-// check whether we can use facingMode
+// Verifica la compatibilità di facingMode
 let supports = navigator.mediaDevices.getSupportedConstraints();
-if( supports['facingMode'] === true ) {
+if (supports['facingMode']) {
   flipBtn.disabled = false;
 }
 
-let stream = null;
-
+// Funzione per avviare la fotocamera
 function capture() {
-  constraints.video = {
-      width: {
-      min: 192,
-      ideal: 192,
-      max: 192,
-    },
-    height: {
-      min: 192,
-      ideal: 192,
-      max: 192
-    },
-    facingMode: shouldFaceUser ? 'user' : 'environment'
-  }
+  let constraints = {
+    audio: false,
+    video: {
+      facingMode: shouldFaceUser ? 'user' : 'environment',
+      width: { min: 192, ideal: 192, max: 192 },
+      height: { min: 192, ideal: 192, max: 192 }
+    }
+  };
+
   navigator.mediaDevices.getUserMedia(constraints)
     .then(function(mediaStream) {
-      stream  = mediaStream;
+      stream = mediaStream;
       on_stream_video.srcObject = stream;
       on_stream_video.play();
     })
     .catch(function(err) {
-      console.log(err)
+      console.error('Errore nell\'accesso alla fotocamera:', err);
     });
 }
 
-flipBtn.addEventListener('click', function(){
-  if( stream == null ) return
-  // we need to flip, stop everything
-  stream.getTracks().forEach(t => {
-    t.stop();
-  });
-  // toggle / flip
+// Funzione per scattare la foto
+document.getElementById("capture-camera").addEventListener("click", function() {
+  const video = document.querySelector('video');
+  if (!video || !video.videoWidth) {
+    console.log("Errore: flusso video non disponibile");
+    return;
+  }
+
+  // Imposta le dimensioni del canvas uguali al video
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  // Disegna l'immagine dal video sul canvas
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  // Ottieni l'immagine dal canvas come Data URL
+  const photoPath = canvas.toDataURL('image/png');
+  
+  // Mostra l'immagine nella pagina
+  document.getElementById('photo').src = photoPath;
+
+  // Mostra il pulsante per salvare la foto
+  document.getElementById('save-photo').style.display = 'inline-block';
+
+  // Aggiungi l'evento di salvataggio della foto
+  document.getElementById('save-photo').onclick = () => {
+    savePhoto(photoPath);
+  };
+});
+
+// Funzione per salvare la foto come file
+function savePhoto(photoPath) {
+  const link = document.createElement('a');
+  link.href = photoPath;
+  link.download = 'foto_catturata.png';
+  link.click();
+}
+
+// Cambia la fotocamera
+flipBtn.addEventListener('click', function() {
+  if (stream) {
+    // Fermiamo il flusso video corrente
+    stream.getTracks().forEach(t => t.stop());
+  }
+  // Cambia la fotocamera
   shouldFaceUser = !shouldFaceUser;
   capture();
-})
-
-capture();
-
-document.getElementById("capture-camera").addEventListener("click", function() {
-  // Elements for taking the snapshot
-    const video = document.querySelector('video');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
 });
+
+// Avvia la fotocamera all'inizio
+capture();
